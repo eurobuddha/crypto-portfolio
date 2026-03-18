@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Portfolio</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #f7931a, #00d4aa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .totals {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .total-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .total-card .label {
+            font-size: 0.9rem;
+            color: #888;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .total-card .value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .total-card.usd .value {
+            color: #00d4aa;
+        }
+
+        .total-card.gbp .value {
+            color: #f7931a;
+        }
+
+        .add-form {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr auto;
+            gap: 12px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input, .form-group select {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            color: #fff;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            border-color: #00d4aa;
+        }
+
+        .form-group select {
+            cursor: pointer;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #00d4aa, #00a884);
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 212, 170, 0.4);
+        }
+
+        .btn-refresh {
+            background: linear-gradient(135deg, #f7931a, #e67e00);
+        }
+
+        .portfolio {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .portfolio-header {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 1fr 60px;
+            padding: 16px 20px;
+            background: rgba(0, 0, 0, 0.2);
+            font-weight: bold;
+            font-size: 0.85rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .portfolio-item {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 1fr 60px;
+            padding: 16px 20px;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: background 0.2s;
+        }
+
+        .portfolio-item:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .portfolio-item:last-child {
+            border-bottom: none;
+        }
+
+        .coin-name {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .coin-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .coin-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+        .coin-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .coin-symbol {
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .coin-full-name {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .amount {
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+        }
+
+        .price {
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+            color: #888;
+        }
+
+        .value-usd, .value-gbp {
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+            font-weight: bold;
+        }
+
+        .value-gbp {
+            color: #f7931a;
+        }
+
+        .btn-delete {
+            background: rgba(255, 82, 82, 0.2);
+            border: none;
+            border-radius: 6px;
+            padding: 8px;
+            color: #ff5252;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-delete:hover {
+            background: rgba(255, 82, 82, 0.4);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #888;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .last-updated {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #00d4aa;
+        }
+
+        .search-container {
+            position: relative;
+        }
+
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #1a1a2e;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin-top: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+        }
+
+        .search-results.active {
+            display: block;
+        }
+
+        .search-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .search-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .search-item img {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .portfolio-header {
+                display: none;
+            }
+
+            .portfolio-item {
+                grid-template-columns: 1fr;
+                gap: 8px;
+                padding: 20px;
+            }
+
+            .coin-name {
+                margin-bottom: 8px;
+            }
+
+            .value-usd, .value-gbp {
+                font-size: 1.1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Crypto Portfolio</h1>
+        </header>
+
+        <div class="totals">
+            <div class="total-card usd">
+                <div class="label">Total Value (USD)</div>
+                <div class="value" id="total-usd">$0.00</div>
+            </div>
+            <div class="total-card gbp">
+                <div class="label">Total Value (GBP)</div>
+                <div class="value" id="total-gbp">£0.00</div>
+            </div>
+        </div>
+
+        <div class="add-form">
+            <form id="add-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Cryptocurrency</label>
+                        <div class="search-container">
+                            <input type="text" id="coin-search" placeholder="Search Bitcoin, Ethereum..." autocomplete="off">
+                            <div class="search-results" id="search-results"></div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Amount</label>
+                        <input type="number" id="amount" placeholder="0.00" step="any" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Price Display</label>
+                        <select id="price-currency">
+                            <option value="usd">USD</option>
+                            <option value="gbp">GBP</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn">Add to Portfolio</button>
+                </div>
+            </form>
+        </div>
+
+        <button class="btn btn-refresh" style="margin-bottom: 20px; width: 100%;" onclick="fetchPrices()">
+            Refresh Prices
+        </button>
+
+        <div class="portfolio">
+            <div class="portfolio-header">
+                <div>Asset</div>
+                <div>Amount</div>
+                <div>Price</div>
+                <div>Value (USD)</div>
+                <div>Value (GBP)</div>
+                <div></div>
+            </div>
+            <div id="portfolio-list">
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                    <p>No assets yet. Add your first cryptocurrency above.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="last-updated" id="last-updated"></div>
+    </div>
+
+    <script>
+        // ============================================
+        // CRYPTO PORTFOLIO TRACKER
+        // ============================================
+
+        const API_BASE = 'https://api.coingecko.com/api/v3';
+        let portfolio = [];
+        let coinData = {};
+        let gbpRate = 0.82;
+        let searchTimeout = null;
+
+        // Load portfolio from localStorage
+        function loadPortfolio() {
+            const saved = localStorage.getItem('cryptoPortfolio');
+            if (saved) {
+                portfolio = JSON.parse(saved);
+                fetchPrices();
+            }
+        }
+
+        // Save portfolio to localStorage
+        function savePortfolio() {
+            localStorage.setItem('cryptoPortfolio', JSON.stringify(portfolio));
+        }
+
+        // Fetch all prices for portfolio coins
+        async function fetchPrices() {
+            if (portfolio.length === 0) {
+                renderPortfolio();
+                return;
+            }
+
+            document.getElementById('portfolio-list').innerHTML = '<div class="loading">Loading prices...</div>';
+
+            try {
+                const ids = portfolio.map(item => item.id).join(',');
+                const response = await fetch(`${API_BASE}/simple/price?ids=${ids}&vs_currencies=usd,gbp&include_24hr_change=true`);
+
+                if (!response.ok) throw new Error('API rate limit exceeded');
+
+                const prices = await response.json();
+
+                // Update portfolio with current prices
+                portfolio.forEach(item => {
+                    if (prices[item.id]) {
+                        item.priceUsd = prices[item.id].usd;
+                        item.priceGbp = prices[item.id].gbp;
+                        item.change24h = prices[item.id].usd_24h_change || 0;
+                    }
+                });
+
+                // Also get GBP exchange rate
+                if (prices[portfolio[0]?.id]) {
+                    gbpRate = prices[portfolio[0].id].gbp / prices[portfolio[0].id].usd;
+                }
+
+                renderPortfolio();
+                updateTotals();
+
+                document.getElementById('last-updated').textContent =
+                    `Last updated: ${new Date().toLocaleTimeString()}`;
+
+            } catch (error) {
+                console.error('Error fetching prices:', error);
+                document.getElementById('portfolio-list').innerHTML =
+                    '<div class="empty-state"><p>Error loading prices. Please try again.</p></div>';
+            }
+        }
+
+        // Search for coins
+        async function searchCoins(query) {
+            if (!query || query.length < 2) {
+                document.getElementById('search-results').classList.remove('active');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/search?query=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                const results = document.getElementById('search-results');
+                results.innerHTML = '';
+
+                data.coins.slice(0, 10).forEach(coin => {
+                    coinData[coin.id] = coin;
+                    const item = document.createElement('div');
+                    item.className = 'search-item';
+                    item.innerHTML = `
+                        <img src="${coin.thumb}" alt="${coin.name}">
+                        <div>
+                            <div style="font-weight: bold;">${coin.name}</div>
+                            <div style="color: #888; font-size: 0.85rem;">${coin.symbol.toUpperCase()}</div>
+                        </div>
+                    `;
+                    item.onclick = () => selectCoin(coin);
+                    results.appendChild(item);
+                });
+
+                results.classList.add('active');
+            } catch (error) {
+                console.error('Search error:', error);
+            }
+        }
+
+        // Select a coin from search results
+        function selectCoin(coin) {
+            document.getElementById('coin-search').value = `${coin.name} (${coin.symbol.toUpperCase()})`;
+            document.getElementById('coin-search').dataset.coinId = coin.id;
+            document.getElementById('search-results').classList.remove('active');
+            document.getElementById('amount').focus();
+        }
+
+        // Add coin to portfolio
+        function addToPortfolio(coinId, amount) {
+            const existing = portfolio.find(item => item.id === coinId);
+            if (existing) {
+                existing.amount += amount;
+            } else {
+                portfolio.push({
+                    id: coinId,
+                    amount: amount,
+                    name: coinData[coinId]?.name || coinId,
+                    symbol: coinData[coinId]?.symbol || '',
+                    thumb: coinData[coinId]?.thumb || ''
+                });
+            }
+            savePortfolio();
+            fetchPrices();
+        }
+
+        // Remove coin from portfolio
+        function removeFromPortfolio(coinId) {
+            portfolio = portfolio.filter(item => item.id !== coinId);
+            savePortfolio();
+            renderPortfolio();
+            updateTotals();
+        }
+
+        // Render portfolio list
+        function renderPortfolio() {
+            const list = document.getElementById('portfolio-list');
+
+            if (portfolio.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                        <p>No assets yet. Add your first cryptocurrency above.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = portfolio.map(item => `
+                <div class="portfolio-item">
+                    <div class="coin-name">
+                        <div class="coin-icon">
+                            ${item.thumb ? `<img src="${item.thumb}" alt="${item.name}">` : ''}
+                        </div>
+                        <div class="coin-info">
+                            <span class="coin-symbol">${item.symbol || item.id}</span>
+                            <span class="coin-full-name">${item.name}</span>
+                        </div>
+                    </div>
+                    <div class="amount">${formatNumber(item.amount)}</div>
+                    <div class="price">$${formatNumber(item.priceUsd || 0)}</div>
+                    <div class="value-usd">$${formatNumber((item.amount * (item.priceUsd || 0)))}</div>
+                    <div class="value-gbp">£${formatNumber((item.amount * (item.priceGbp || 0)))}</div>
+                    <button class="btn-delete" onclick="removeFromPortfolio('${item.id}')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/>
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // Update total values
+        function updateTotals() {
+            let totalUsd = 0;
+            let totalGbp = 0;
+
+            portfolio.forEach(item => {
+                totalUsd += item.amount * (item.priceUsd || 0);
+                totalGbp += item.amount * (item.priceGbp || 0);
+            });
+
+            document.getElementById('total-usd').textContent = `$${formatNumber(totalUsd)}`;
+            document.getElementById('total-gbp').textContent = `£${formatNumber(totalGbp)}`;
+        }
+
+        // Format number with commas and decimals
+        function formatNumber(num) {
+            if (num === undefined || num === null) return '0.00';
+            if (num >= 1000000) {
+                return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+            if (num >= 1) {
+                return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+            return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 });
+        }
+
+        // Event Listeners
+        document.getElementById('add-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const coinId = document.getElementById('coin-search').dataset.coinId;
+            const amount = parseFloat(document.getElementById('amount').value);
+
+            if (!coinId || !amount || amount <= 0) {
+                alert('Please search for a cryptocurrency and enter a valid amount.');
+                return;
+            }
+
+            addToPortfolio(coinId, amount);
+
+            // Reset form
+            document.getElementById('coin-search').value = '';
+            document.getElementById('coin-search').dataset.coinId = '';
+            document.getElementById('amount').value = '';
+        });
+
+        document.getElementById('coin-search').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                searchCoins(e.target.value);
+            }, 300);
+        });
+
+        document.getElementById('coin-search').addEventListener('blur', () => {
+            setTimeout(() => {
+                document.getElementById('search-results').classList.remove('active');
+            }, 200);
+        });
+
+        // Auto-refresh prices every 60 seconds
+        setInterval(fetchPrices, 60000);
+
+        // Initialize
+        loadPortfolio();
+    </script>
+</body>
+</html>
