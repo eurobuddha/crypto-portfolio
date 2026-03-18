@@ -267,6 +267,10 @@
             color: #666;
         }
 
+        .stale-warning {
+            color: #f7931a;
+        }
+
         .loading {
             text-align: center;
             padding: 20px;
@@ -419,13 +423,48 @@
         let coinData = {};
         let gbpRate = 0.82;
         let searchTimeout = null;
+        let lastFetchTime = null;
+        let usingCachedPrices = false;
 
         // Load portfolio from localStorage
         function loadPortfolio() {
             const saved = localStorage.getItem('cryptoPortfolio');
             if (saved) {
                 portfolio = JSON.parse(saved);
-                fetchPrices();
+                loadCachedPrices();
+                renderPortfolio();
+                updateTotals();
+            }
+        }
+
+        // Cache prices to localStorage
+        function cachePrices() {
+            const priceCache = portfolio.map(item => ({
+                id: item.id,
+                priceUsd: item.priceUsd,
+                priceGbp: item.priceGbp,
+                change24h: item.change24h
+            }));
+            localStorage.setItem('cryptoPriceCache', JSON.stringify({
+                prices: priceCache,
+                timestamp: Date.now()
+            }));
+        }
+
+        // Load cached prices from localStorage
+        function loadCachedPrices() {
+            const cache = localStorage.getItem('cryptoPriceCache');
+            if (cache) {
+                const { prices, timestamp } = JSON.parse(cache);
+                prices.forEach(cached => {
+                    const item = portfolio.find(p => p.id === cached.id);
+                    if (item) {
+                        item.priceUsd = cached.priceUsd;
+                        item.priceGbp = cached.priceGbp;
+                        item.change24h = cached.change24h;
+                    }
+                });
+                lastFetchTime = timestamp;
             }
         }
 
@@ -465,6 +504,11 @@
                     gbpRate = prices[portfolio[0].id].gbp / prices[portfolio[0].id].usd;
                 }
 
+                // Cache successful prices
+                cachePrices();
+                lastFetchTime = Date.now();
+                usingCachedPrices = false;
+
                 renderPortfolio();
                 updateTotals();
 
@@ -473,8 +517,20 @@
 
             } catch (error) {
                 console.error('Error fetching prices:', error);
-                document.getElementById('portfolio-list').innerHTML =
-                    '<div class="empty-state"><p>Error loading prices. Please try again.</p></div>';
+                usingCachedPrices = true;
+                renderPortfolio();
+                updateTotals();
+                updateLastUpdated();
+            }
+        }
+
+        function updateLastUpdated() {
+            const el = document.getElementById('last-updated');
+            if (lastFetchTime) {
+                const date = new Date(lastFetchTime);
+                el.innerHTML = `<span style="color: #f7931a;">Using cached prices from ${date.toLocaleTimeString()}</span>`;
+            } else {
+                el.textContent = '';
             }
         }
 
