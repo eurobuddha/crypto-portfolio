@@ -216,6 +216,30 @@
             font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
         }
 
+        .amount.editable {
+            cursor: pointer;
+            border-bottom: 1px dashed transparent;
+            width: fit-content;
+        }
+
+        .amount.editable:hover {
+            color: #00d4aa;
+            border-bottom-color: #00d4aa;
+        }
+
+        .amount-input {
+            width: 100%;
+            max-width: 120px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #00d4aa;
+            border-radius: 6px;
+            padding: 4px 8px;
+            color: #fff;
+            font-family: inherit;
+            font-size: inherit;
+            outline: none;
+        }
+
         .price {
             font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
             color: #888;
@@ -1138,7 +1162,9 @@
                             <span class="coin-full-name">${item.name}</span>
                         </div>
                     </div>
-                    <div class="amount">${formatNumber(item.amount)}</div>
+                    ${isWallet
+                        ? `<div class="amount" title="Synced from wallet">${formatAmount(item.amount)}</div>`
+                        : `<div class="amount editable" title="Click to edit" onclick="startEditAmount(this, '${item.id}')">${formatAmount(item.amount)}</div>`}
                     <div class="price">$${formatNumber(item.priceUsd || 0)}</div>
                     <div class="value-usd">$${formatNumber((item.amount * (item.priceUsd || 0)))}</div>
                     <div class="value-gbp">£${formatNumber((item.amount * (item.priceGbp || 0)))}</div>
@@ -1149,6 +1175,45 @@
                     </button>
                 </div>
             `}).join('');
+        }
+
+        // Inline-edit a manual asset's amount by clicking it
+        function startEditAmount(el, coinId) {
+            if (el.querySelector('input')) return;
+            const item = portfolio.find(p => p.id === coinId && !p.walletId);
+            if (!item) return;
+
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.step = 'any';
+            input.min = '0';
+            input.className = 'amount-input';
+            input.value = item.amount;
+            el.textContent = '';
+            el.appendChild(input);
+            input.focus();
+            input.select();
+
+            let done = false;
+            const finish = (commit) => {
+                if (done) return;
+                done = true;
+                if (commit) {
+                    const newAmount = parseFloat(input.value);
+                    if (!isNaN(newAmount) && newAmount > 0) {
+                        item.amount = newAmount;
+                        savePortfolio();
+                    }
+                }
+                renderPortfolio();
+                updateTotals();
+            };
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') finish(true);
+                else if (e.key === 'Escape') finish(false);
+            });
+            input.addEventListener('blur', () => finish(true));
         }
 
         // Update total values
@@ -1163,6 +1228,12 @@
 
             document.getElementById('total-usd').textContent = `$${formatNumber(totalUsd)}`;
             document.getElementById('total-gbp').textContent = `£${formatNumber(totalGbp)}`;
+        }
+
+        // Format an asset amount: always 5 decimal places
+        function formatAmount(num) {
+            if (num === undefined || num === null) return '0.00000';
+            return num.toLocaleString('en-US', { minimumFractionDigits: 5, maximumFractionDigits: 5 });
         }
 
         // Format number with commas and decimals
