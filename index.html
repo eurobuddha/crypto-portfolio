@@ -227,7 +227,25 @@
             border-bottom-color: #00d4aa;
         }
 
-        .amount-input {
+        .separate-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+            font-size: 0.85rem;
+            color: #888;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .separate-toggle input {
+            width: 16px;
+            height: 16px;
+            accent-color: #00d4aa;
+            cursor: pointer;
+        }
+
+        .amount-input, .price-input {
             width: 100%;
             max-width: 120px;
             background: rgba(0, 0, 0, 0.3);
@@ -238,6 +256,72 @@
             font-family: inherit;
             font-size: inherit;
             outline: none;
+        }
+
+        .price.editable {
+            cursor: pointer;
+            border-bottom: 1px dashed transparent;
+            width: fit-content;
+        }
+
+        .price.editable:hover {
+            color: #00d4aa;
+            border-bottom-color: #00d4aa;
+        }
+
+        .price.overridden {
+            color: #f7931a;
+            cursor: pointer;
+            width: fit-content;
+        }
+
+        .whatif-tag {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            background: rgba(247, 147, 26, 0.15);
+            color: #f7931a;
+            padding: 1px 5px;
+            border-radius: 4px;
+            margin-left: 6px;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        .portfolio-item.whatif-row {
+            box-shadow: inset 3px 0 0 #f7931a;
+        }
+
+        .whatif-banner {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: rgba(247, 147, 26, 0.1);
+            border: 1px solid rgba(247, 147, 26, 0.3);
+            border-radius: 12px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            color: #f7931a;
+        }
+
+        .whatif-banner.active {
+            display: flex;
+        }
+
+        .btn-reset-whatif {
+            background: rgba(247, 147, 26, 0.2);
+            border: none;
+            border-radius: 6px;
+            padding: 6px 14px;
+            color: #f7931a;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-reset-whatif:hover {
+            background: rgba(247, 147, 26, 0.35);
         }
 
         .price {
@@ -561,6 +645,11 @@
             </div>
         </div>
 
+        <div class="whatif-banner" id="whatif-banner">
+            <span>Totals include one or more what-if prices.</span>
+            <button class="btn-reset-whatif" onclick="clearAllOverrides()">Reset all to live prices</button>
+        </div>
+
         <div class="wallet-section">
             <h3 style="margin-bottom: 16px; color: #888; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Watch Wallets</h3>
             <form id="wallet-form" class="wallet-form">
@@ -611,6 +700,10 @@
                     </div>
                     <button type="submit" class="btn">Add to Portfolio</button>
                 </div>
+                <label class="separate-toggle">
+                    <input type="checkbox" id="keep-separate">
+                    Add as a separate entry (don't combine with an existing holding)
+                </label>
             </form>
         </div>
 
@@ -661,6 +754,11 @@
             const saved = localStorage.getItem('cryptoPortfolio');
             if (saved) {
                 portfolio = JSON.parse(saved);
+                // Ensure every manual item has a stable per-row id
+                portfolio.forEach(item => {
+                    if (!item.walletId && !item.uid) item.uid = generateId();
+                });
+                savePortfolio();
                 loadCachedPrices();
                 renderPortfolio();
                 updateTotals();
@@ -687,12 +785,11 @@
             if (cache) {
                 const { prices, timestamp } = JSON.parse(cache);
                 prices.forEach(cached => {
-                    const item = portfolio.find(p => p.id === cached.id);
-                    if (item) {
+                    portfolio.filter(p => p.id === cached.id).forEach(item => {
                         item.priceUsd = cached.priceUsd;
                         item.priceGbp = cached.priceGbp;
                         item.change24h = cached.change24h;
-                    }
+                    });
                 });
                 lastFetchTime = timestamp;
             }
@@ -1100,12 +1197,13 @@
         }
 
         // Add coin to portfolio
-        function addToPortfolio(coinId, amount) {
-            const existing = portfolio.find(item => item.id === coinId);
-            if (existing) {
+        function addToPortfolio(coinId, amount, keepSeparate = false) {
+            const existing = portfolio.find(item => item.id === coinId && !item.walletId);
+            if (existing && !keepSeparate) {
                 existing.amount += amount;
             } else {
                 portfolio.push({
+                    uid: generateId(),
                     id: coinId,
                     amount: amount,
                     name: coinData[coinId]?.name || coinId,
@@ -1117,11 +1215,11 @@
             fetchPrices();
         }
 
-        function removeFromPortfolio(coinId, walletId = '') {
+        function removeFromPortfolio(uid, walletId = '') {
             if (walletId) {
                 portfolio = portfolio.filter(item => item.walletId !== walletId);
             } else {
-                portfolio = portfolio.filter(item => item.id !== coinId || item.walletId);
+                portfolio = portfolio.filter(item => item.uid !== uid);
             }
             savePortfolio();
             renderPortfolio();
@@ -1146,10 +1244,17 @@
 
             list.innerHTML = portfolio.map(item => {
                 const isWallet = item.source === 'wallet';
-                const sourceBadge = isWallet 
+                const sourceBadge = isWallet
                     ? `<span class="source-badge">${item.walletLabel || 'wallet'}</span>`
                     : `<span class="source-badge manual">manual</span>`;
-                const itemClass = isWallet ? 'portfolio-item wallet-source' : 'portfolio-item';
+                const overridden = item.overrideUsd != null;
+                const itemClass = (isWallet ? 'portfolio-item wallet-source' : 'portfolio-item') + (overridden ? ' whatif-row' : '');
+                const rowKey = item.uid || item.walletId || item.id;
+                const eUsd = effectivePriceUsd(item);
+                const eGbp = effectivePriceGbp(item);
+                const priceCell = overridden
+                    ? `<div class="price overridden" onclick="startEditPrice(this, '${rowKey}')" title="What-if price (live: $${formatNumber(item.priceUsd || 0)}). Click to change, or clear the field to reset.">$${formatNumber(eUsd)}<span class="whatif-tag">what-if</span></div>`
+                    : `<div class="price editable" onclick="startEditPrice(this, '${rowKey}')" title="Click to set a what-if price">$${formatNumber(eUsd)}</div>`;
                 return `
                 <div class="${itemClass}">
                     <div class="coin-name">
@@ -1164,11 +1269,11 @@
                     </div>
                     ${isWallet
                         ? `<div class="amount" title="Synced from wallet">${formatAmount(item.amount)}</div>`
-                        : `<div class="amount editable" title="Click to edit" onclick="startEditAmount(this, '${item.id}')">${formatAmount(item.amount)}</div>`}
-                    <div class="price">$${formatNumber(item.priceUsd || 0)}</div>
-                    <div class="value-usd">$${formatNumber((item.amount * (item.priceUsd || 0)))}</div>
-                    <div class="value-gbp">£${formatNumber((item.amount * (item.priceGbp || 0)))}</div>
-                    <button class="btn-delete" onclick="removeFromPortfolio('${item.id}', '${item.walletId || ''}')">
+                        : `<div class="amount editable" title="Click to edit" onclick="startEditAmount(this, '${item.uid}')">${formatAmount(item.amount)}</div>`}
+                    ${priceCell}
+                    <div class="value-usd">$${formatNumber((item.amount * eUsd))}</div>
+                    <div class="value-gbp">£${formatNumber((item.amount * eGbp))}</div>
+                    <button class="btn-delete" onclick="removeFromPortfolio('${item.uid || ''}', '${item.walletId || ''}')">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/>
                         </svg>
@@ -1178,9 +1283,9 @@
         }
 
         // Inline-edit a manual asset's amount by clicking it
-        function startEditAmount(el, coinId) {
+        function startEditAmount(el, uid) {
             if (el.querySelector('input')) return;
-            const item = portfolio.find(p => p.id === coinId && !p.walletId);
+            const item = portfolio.find(p => p.uid === uid && !p.walletId);
             if (!item) return;
 
             const input = document.createElement('input');
@@ -1216,18 +1321,85 @@
             input.addEventListener('blur', () => finish(true));
         }
 
+        // Effective prices: use a what-if override when set, else the live price
+        function effectivePriceUsd(item) {
+            return item.overrideUsd != null ? item.overrideUsd : (item.priceUsd || 0);
+        }
+
+        function effectivePriceGbp(item) {
+            if (item.overrideUsd != null) {
+                const ratio = item.priceUsd ? (item.priceGbp / item.priceUsd) : gbpRate;
+                return item.overrideUsd * ratio;
+            }
+            return item.priceGbp || 0;
+        }
+
+        // Inline-edit a row's what-if price by clicking it; clearing the field reverts to live
+        function startEditPrice(el, key) {
+            if (el.querySelector('input')) return;
+            const item = portfolio.find(p => (p.uid && p.uid === key) || (p.walletId && p.walletId === key));
+            if (!item) return;
+
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.step = 'any';
+            input.min = '0';
+            input.className = 'price-input';
+            input.value = effectivePriceUsd(item);
+            el.textContent = '';
+            el.appendChild(input);
+            input.focus();
+            input.select();
+
+            let done = false;
+            const finish = (commit) => {
+                if (done) return;
+                done = true;
+                if (commit) {
+                    const raw = input.value.trim();
+                    if (raw === '') {
+                        delete item.overrideUsd;
+                    } else {
+                        const newPrice = parseFloat(raw);
+                        if (!isNaN(newPrice) && newPrice >= 0) item.overrideUsd = newPrice;
+                    }
+                    savePortfolio();
+                }
+                renderPortfolio();
+                updateTotals();
+            };
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') finish(true);
+                else if (e.key === 'Escape') finish(false);
+            });
+            input.addEventListener('blur', () => finish(true));
+        }
+
+        // Clear all what-if price overrides
+        function clearAllOverrides() {
+            portfolio.forEach(item => { delete item.overrideUsd; });
+            savePortfolio();
+            renderPortfolio();
+            updateTotals();
+        }
+
         // Update total values
         function updateTotals() {
             let totalUsd = 0;
             let totalGbp = 0;
 
             portfolio.forEach(item => {
-                totalUsd += item.amount * (item.priceUsd || 0);
-                totalGbp += item.amount * (item.priceGbp || 0);
+                totalUsd += item.amount * effectivePriceUsd(item);
+                totalGbp += item.amount * effectivePriceGbp(item);
             });
 
             document.getElementById('total-usd').textContent = `$${formatNumber(totalUsd)}`;
             document.getElementById('total-gbp').textContent = `£${formatNumber(totalGbp)}`;
+
+            const banner = document.getElementById('whatif-banner');
+            const anyOverride = portfolio.some(item => item.overrideUsd != null);
+            banner.classList.toggle('active', anyOverride);
         }
 
         // Format an asset amount: always 5 decimal places
@@ -1294,18 +1466,20 @@
             e.preventDefault();
             const coinId = document.getElementById('coin-search').dataset.coinId;
             const amount = parseFloat(document.getElementById('amount').value);
+            const keepSeparate = document.getElementById('keep-separate').checked;
 
             if (!coinId || !amount || amount <= 0) {
                 alert('Please search for a cryptocurrency and enter a valid amount.');
                 return;
             }
 
-            addToPortfolio(coinId, amount);
+            addToPortfolio(coinId, amount, keepSeparate);
 
             // Reset form
             document.getElementById('coin-search').value = '';
             document.getElementById('coin-search').dataset.coinId = '';
             document.getElementById('amount').value = '';
+            document.getElementById('keep-separate').checked = false;
         });
 
         document.getElementById('coin-search').addEventListener('input', (e) => {
